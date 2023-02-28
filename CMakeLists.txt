@@ -100,7 +100,7 @@
 #                               generators. (default: Release).
 #
 # CMAKE_CXX_STANDARD            C++ standard to build all targets. Supported
-#                               values are 98, 11, and 14. (default: 98)
+#                               values are 98, 11, 14, and 17. (default: 98)
 #
 # CMAKE_CXX_STANDARD_REQUIRED   The with CMAKE_CXX_STANDARD selected C++ standard
 #                               is a requirement. (default: ON)
@@ -148,6 +148,10 @@
 #
 # ENABLE_PTHREADS               Use POSIX threads for SystemC processes instead
 #                               of QuickThreads on Unix or Fiber on Windows.
+#
+# ENABLE_LEGACY_MEM_MGMT        Use std::malloc or posix_memalign to allocate the
+#                               stack of the coroutines instead of mmap. ASAN will
+#                               not work with this.
 #
 # OVERRIDE_DEFAULT_STACK_SIZE   Define the default stack size used for SystemC
 #                               (thread) processes. (> 0)
@@ -274,7 +278,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif (NOT CMAKE_BUILD_TYPE)
 
 set (CMAKE_CXX_STANDARD 98 CACHE STRING
-     "C++ standard to build all targets. Supported values are 98, 11, and 14.")
+     "C++ standard to build all targets. Supported values are 98, 11, 14, and 17.")
 set (CMAKE_CXX_STANDARD_REQUIRED ON CACHE BOOL
      "The with CMAKE_CXX_STANDARD selected C++ standard is a requirement.")
 mark_as_advanced (CMAKE_CXX_STANDARD_REQUIRED)
@@ -315,6 +319,10 @@ option (ENABLE_PTHREADS
 
 option (INSTALL_TO_LIB_BUILD_TYPE_DIR
         "Install the libraries to lib-${CMAKE_BUILD_TYPE} to enable parallel installation of the different build variants. (default: OFF)"
+        OFF)
+
+option (ENABLE_LEGACY_MEM_MGMT
+        "Use of std::malloc or posix_memalign instead of mmap to allocate coroutine stack. Breaks ASAN."
         OFF)
 
 if (NOT INSTALL_TO_LIB_BUILD_TYPE_DIR)
@@ -506,6 +514,10 @@ else (ENABLE_PTHREADS)
 endif (ENABLE_PTHREADS)
 
 if (QT_ARCH)
+  # QuickThreads stack protection can benefit from posix_memalign
+  include(CheckSymbolExists)
+  check_symbol_exists(posix_memalign "stdlib.h" HAVE_POSIX_MEMALIGN)
+
   # To build QuickThreads, enable the assembler support.
   enable_language (ASM)
 else (QT_ARCH)
@@ -660,6 +672,7 @@ if (ENABLE_PTHREADS)
 else (ENABLE_PTHREADS)
   message (STATUS "ENABLE_PTHREADS = ${ENABLE_PTHREADS}")
 endif (ENABLE_PTHREADS)
+message (STATUS "ENABLE_LEGACY_MEM_MGMT = ${ENABLE_LEGACY_MEM_MGMT}")
 if (OVERRIDE_DEFAULT_STACK_SIZE GREATER 0)
   message ("OVERRIDE_DEFAULT_STACK_SIZE = ${OVERRIDE_DEFAULT_STACK_SIZE}")
 endif (OVERRIDE_DEFAULT_STACK_SIZE GREATER 0)
@@ -710,7 +723,6 @@ message (STATUS "===============================================================
 # Subdirectories
 ###############################################################################
 
-add_subdirectory (docs)
 add_subdirectory (src)
 add_subdirectory (examples)
 
